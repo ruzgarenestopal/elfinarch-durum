@@ -1,0 +1,53 @@
+# Uptime check for elfinarch.com (a lighter stand-in for Upptime: no personal token needed).
+# A failed run makes GitHub e-mail the owner. DURUM.md is rewritten only when the state changes,
+# plus a weekly line, so the repository stays active and GitHub keeps the schedule running.
+name: Site nöbeti
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nobet
+  cancel-in-progress: false
+
+jobs:
+  yokla:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Adresleri yokla
+        id: yokla
+        run: |
+          set -u
+          down=""
+          for path in / /tasarla; do
+            ok=""
+            for try in 1 2 3; do
+              code=$(curl -s -o /dev/null -w '%{http_code} %{time_total}' --max-time 15 -A "elfinarch-nobetci" "https://elfinarch.com$path") || code="000 15"
+              echo "$path deneme $try: $code"
+              if [ "${code%% *}" = "200" ]; then ok=1; break; fi
+              sleep 20
+            done
+            [ -n "$ok" ] || down="$down $path"
+          done
+          echo "down=$down" >> "$GITHUB_OUTPUT"
+      - name: Durumu yaz
+        run: |
+          now=$(date -u '+%Y-%m-%d %H:%M UTC')
+          if [ -z "${{ steps.yokla.outputs.down }}" ]; then state="Site açık"; else state="SİTE AÇILMIYOR:${{ steps.yokla.outputs.down }}"; fi
+          old=$(head -1 DURUM.md 2>/dev/null || true)
+          week=$(date -u +%G-%V); last_week=$(sed -n 's/^Hafta: //p' DURUM.md 2>/dev/null || true)
+          if [ "$old" != "$state" ] || [ "$week" != "$last_week" ]; then
+            printf '%s\n\nSon değişiklik: %s\nHafta: %s\n' "$state" "$now" "$week" > DURUM.md
+            git config user.name "nobetci"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add DURUM.md && git commit -qm "$state ($now)" && git push -q
+          fi
+      - name: Kapalıysa kırmızı yan
+        if: steps.yokla.outputs.down != ''
+        run: echo "::error::Açılmayan adresler:${{ steps.yokla.outputs.down }}" && exit 1
