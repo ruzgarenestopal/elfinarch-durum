@@ -1,4 +1,4 @@
 Site açık
 
-Son değişiklik: 2026-11-04 17:46 UTC
-Hafta: 2026-45
+Son değişiklik: 2026-11-09 05:58 UTC
+Hafta: 2026-46
